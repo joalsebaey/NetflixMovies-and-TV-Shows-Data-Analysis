@@ -1,0 +1,422 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import calendar
+from collections import Counter
+import seaborn as sns
+from datetime import datetime
+import re
+
+# Global variable to store image titles
+_mfajlsdf98q21_image_title_list = []
+
+# Set style for better visualization
+plt.style.use('ggplot')
+
+print("Loading and preprocessing Netflix dataset...")
+
+# Load the dataset
+df = pd.read_csv('netflix_data.csv')
+
+# Data cleaning and preprocessing
+# Handle missing values
+df['country'] = df['country'].fillna('Unknown')
+df['director'] = df['director'].fillna('Unknown')
+df['cast'] = df['cast'].fillna('Unknown')
+df['date_added'] = df['date_added'].fillna('Unknown')
+
+# Convert 'date_added' to datetime format for proper analysis
+def parse_date(date_str):
+    if date_str == 'Unknown':
+        return None
+    try:
+        return pd.to_datetime(date_str.strip(), format='%B %d, %Y')
+    except:
+        try:
+            return pd.to_datetime(date_str.strip())
+        except:
+            return None
+
+df['date_added_dt'] = df['date_added'].apply(parse_date)
+
+# Extract month from the date_added column for monthly analysis
+df['month_added'] = df['date_added_dt'].dt.month
+df['year_added'] = df['date_added_dt'].dt.year
+
+# Extract numeric values from duration
+def extract_duration(duration_str):
+    if pd.isna(duration_str):
+        return np.nan
+    
+    match = re.search(r'(\d+)', duration_str)
+    if match:
+        return float(match.group(1))
+    return np.nan
+
+df['duration_numeric'] = df['duration'].apply(extract_duration)
+
+print("Data preprocessing complete. Starting analysis...")
+
+# 1. Analysis of Movies vs TV Shows Distribution
+def plot_content_distribution():
+    plt.figure(figsize=(12, 6))
+    
+    # Count content types
+    content_counts = df['type'].value_counts()
+    
+    # Create pie chart
+    plt.pie(content_counts, labels=content_counts.index, autopct='%1.1f%%', 
+            colors=['#ff9999','#66b3ff'], startangle=90, explode=(0.1, 0))
+    
+    plt.title('Distribution of Content on Netflix: Movies vs TV Shows', fontsize=16)
+    plt.axis('equal')
+    
+    # Add the title to our list
+    _mfajlsdf98q21_image_title_list.append('Distribution of Content on Netflix: Movies vs TV Shows')
+    plt.tight_layout()
+    plt.show()
+
+# 2. Monthly Content Release Analysis
+def plot_monthly_release_pattern():
+    # Filter out rows with missing month information
+    monthly_df = df[df['month_added'].notna()]
+    
+    # Count content by month
+    monthly_content = monthly_df.groupby('month_added')['show_id'].count()
+    
+    # Ensure all months are represented (even if zero)
+    all_months = pd.Series(0, index=range(1, 13))
+    monthly_content = monthly_content.reindex(all_months.index).fillna(0)
+    
+    # Create month labels
+    month_names = [calendar.month_name[i] for i in range(1, 13)]
+    
+    plt.figure(figsize=(14, 7))
+    
+    # Create bar chart for monthly content distribution
+    bars = plt.bar(month_names, monthly_content.values, color='skyblue')
+    
+    # Find the month with maximum content
+    best_month_idx = monthly_content.values.argmax()
+    best_month = best_month_idx + 1  # Add 1 because months are 1-indexed
+    
+    # Highlight the best month
+    bars[best_month_idx].set_color('green')
+    
+    plt.title('Monthly Distribution of Netflix Content Additions', fontsize=16)
+    plt.xlabel('Month', fontsize=14)
+    plt.ylabel('Number of Titles Added', fontsize=14)
+    plt.xticks(rotation=45)
+    plt.annotate(f'Peak Month: {calendar.month_name[best_month]}',
+                xy=(best_month_idx, monthly_content.values[best_month_idx]),
+                xytext=(best_month_idx, monthly_content.values[best_month_idx] + 50),
+                arrowprops=dict(facecolor='black', shrink=0.05, width=1.5),
+                fontsize=12)
+    
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Monthly Distribution of Netflix Content Additions')
+    plt.tight_layout()
+    plt.show()
+
+# 3. Analyze monthly content by type
+def plot_monthly_content_by_type():
+    # Filter data with valid month information
+    valid_month_df = df[df['month_added'].notna()]
+    
+    # Group by month and type
+    monthly_type = valid_month_df.groupby(['month_added', 'type']).size().unstack().fillna(0)
+    
+    # Ensure all months are included
+    all_months = pd.DataFrame(index=range(1, 13))
+    monthly_type = monthly_type.reindex(all_months.index).fillna(0)
+    
+    # Convert month numbers to names
+    month_names = [calendar.month_name[i] for i in range(1, 13)]
+    
+    plt.figure(figsize=(14, 8))
+    
+    # Create a bar chart
+    x = np.arange(len(month_names))
+    width = 0.35
+    
+    # Ensure we have both 'Movie' and 'TV Show' columns
+    if 'Movie' in monthly_type.columns:
+        movie_data = monthly_type['Movie']
+    else:
+        movie_data = pd.Series(0, index=monthly_type.index)
+        
+    if 'TV Show' in monthly_type.columns:
+        tv_data = monthly_type['TV Show']
+    else:
+        tv_data = pd.Series(0, index=monthly_type.index)
+    
+    plt.bar(x - width/2, movie_data, width, label='Movies')
+    plt.bar(x + width/2, tv_data, width, label='TV Shows')
+    
+    plt.xlabel('Month', fontsize=14)
+    plt.ylabel('Number of Titles', fontsize=14)
+    plt.title('Monthly Addition of Movies vs. TV Shows on Netflix', fontsize=16)
+    plt.xticks(x, month_names, rotation=45)
+    plt.legend()
+    
+    # Find best month for each content type
+    best_month_movies = movie_data.idxmax()
+    best_month_tvshows = tv_data.idxmax()
+    
+    plt.annotate(f'Best Month for Movies: {calendar.month_name[best_month_movies]}',
+                xy=(best_month_movies-1, movie_data.iloc[best_month_movies-1]),
+                xytext=(best_month_movies-1, movie_data.iloc[best_month_movies-1] + 20),
+                arrowprops=dict(facecolor='black', shrink=0.05),
+                fontsize=10)
+    
+    plt.annotate(f'Best Month for TV Shows: {calendar.month_name[best_month_tvshows]}',
+                xy=(best_month_tvshows-1, tv_data.iloc[best_month_tvshows-1]),
+                xytext=(best_month_tvshows-1, tv_data.iloc[best_month_tvshows-1] + 20),
+                arrowprops=dict(facecolor='black', shrink=0.05),
+                fontsize=10)
+    
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Monthly Addition of Movies vs. TV Shows on Netflix')
+    plt.tight_layout()
+    plt.show()
+
+# 4. Analyze content ratings distribution
+def plot_ratings_distribution():
+    plt.figure(figsize=(14, 8))
+    
+    # Create a countplot of ratings
+    ratings_count = df['rating'].value_counts().sort_values(ascending=False)
+    
+    # Filter out ratings with very few entries to make the chart cleaner
+    significant_ratings = ratings_count[ratings_count > 10]
+    
+    plt.bar(significant_ratings.index, significant_ratings.values, color='lightcoral')
+    plt.title('Distribution of Content Ratings on Netflix', fontsize=16)
+    plt.xlabel('Rating Category', fontsize=14)
+    plt.ylabel('Number of Titles', fontsize=14)
+    plt.xticks(rotation=45)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Distribution of Content Ratings on Netflix')
+    plt.tight_layout()
+    plt.show()
+
+# 5. Compare ratings distribution between Movies and TV Shows
+def plot_ratings_by_content_type():
+    plt.figure(figsize=(16, 10))
+    
+    # Filter out records with missing ratings
+    valid_ratings_df = df[df['rating'].notna()]
+    
+    # Create a crosstab of content type and ratings
+    ratings_by_type = pd.crosstab(valid_ratings_df['rating'], valid_ratings_df['type'])
+    
+    # Filter out ratings with very few entries
+    significant_ratings = ratings_by_type[ratings_by_type.sum(axis=1) > 10]
+    
+    # Sort by total count for better visualization
+    significant_ratings = significant_ratings.loc[significant_ratings.sum(axis=1).sort_values(ascending=False).index]
+    
+    significant_ratings.plot(kind='bar', stacked=False, figsize=(16, 10), color=['skyblue', 'salmon'])
+    plt.title('Ratings Distribution: Movies vs TV Shows', fontsize=16)
+    plt.xlabel('Rating Category', fontsize=14)
+    plt.ylabel('Number of Titles', fontsize=14)
+    plt.xticks(rotation=45)
+    plt.legend(title='Content Type')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Ratings Distribution: Movies vs TV Shows')
+    plt.tight_layout()
+    plt.show()
+
+# 6. Top content-producing countries
+def plot_top_countries():
+    plt.figure(figsize=(14, 8))
+    
+    # Split multiple countries and count each occurrence
+    all_countries = []
+    for countries in df['country'].dropna():
+        if isinstance(countries, str):
+            for country in countries.split(','):
+                all_countries.append(country.strip())
+    
+    # Count country occurrences
+    country_counts = Counter(all_countries)
+    
+    # Get the top 15 countries
+    top_countries = dict(country_counts.most_common(15))
+    
+    # Create horizontal bar chart
+    plt.barh(list(reversed(list(top_countries.keys()))), 
+            list(reversed(list(top_countries.values()))), 
+            color='lightgreen')
+    
+    plt.title('Top 15 Content Producing Countries on Netflix', fontsize=16)
+    plt.xlabel('Number of Titles', fontsize=14)
+    plt.ylabel('Country', fontsize=14)
+    plt.grid(axis='x', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Top 15 Content Producing Countries on Netflix')
+    plt.tight_layout()
+    plt.show()
+
+# 7. Release trends over time (for when to release)
+def plot_release_trends():
+    plt.figure(figsize=(16, 8))
+    
+    # Filter data with valid date information
+    valid_date_df = df[df['date_added_dt'].notna()]
+    
+    # Generate year and month for each entry
+    valid_date_df['year_month'] = valid_date_df['date_added_dt'].dt.to_period('M')
+    
+    # Count titles by year-month and content type
+    monthly_trends = valid_date_df.groupby(['year_month', 'type']).size().unstack().fillna(0)
+    
+    # Fill in missing months with zeros
+    monthly_trends = monthly_trends.asfreq('M', fill_value=0)
+    
+    # Plot the data
+    monthly_trends.plot(figsize=(16, 8), linewidth=2.5)
+    plt.title('Netflix Content Addition Trends Over Time', fontsize=16)
+    plt.xlabel('Date', fontsize=14)
+    plt.ylabel('Number of Titles Added', fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(title='Content Type')
+    
+    _mfajlsdf98q21_image_title_list.append('Netflix Content Addition Trends Over Time')
+    plt.tight_layout()
+    plt.show()
+
+# 8. Genres analysis
+def plot_genre_distribution():
+    plt.figure(figsize=(16, 10))
+    
+    # Split the listed_in column and count genre occurrences
+    genres = []
+    for genre_list in df['listed_in'].dropna():
+        for genre in genre_list.split(','):
+            genres.append(genre.strip())
+    
+    # Count genre occurrences
+    genre_counts = Counter(genres)
+    
+    # Get the top 20 genres
+    top_genres = dict(genre_counts.most_common(20))
+    
+    # Create horizontal bar chart
+    plt.barh(list(reversed(list(top_genres.keys()))), 
+            list(reversed(list(top_genres.values()))), 
+            color='lightblue')
+    
+    plt.title('Top 20 Genres on Netflix', fontsize=16)
+    plt.xlabel('Number of Titles', fontsize=14)
+    plt.ylabel('Genre', fontsize=14)
+    plt.grid(axis='x', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Top 20 Genres on Netflix')
+    plt.tight_layout()
+    plt.show()
+
+# 9. Find the optimal release month based on historical data
+def plot_optimal_release_month():
+    plt.figure(figsize=(16, 8))
+    
+    # Filter for recent years to get more relevant trends (e.g., last 5 years)
+    recent_years = df[df['year_added'] >= 2015]
+    valid_month_recent = recent_years[recent_years['month_added'].notna()]
+    
+    # Count additions by month for recent years
+    monthly_recent = valid_month_recent.groupby('month_added')['show_id'].count()
+    
+    # Ensure all months are represented
+    all_months = pd.Series(0, index=range(1, 13))
+    monthly_recent = monthly_recent.reindex(all_months.index).fillna(0)
+    
+    # Create month labels
+    month_names = [calendar.month_name[i] for i in range(1, 13)]
+    
+    # Create bar chart for optimal release month
+    bars = plt.bar(month_names, monthly_recent.values, color='purple', alpha=0.7)
+    
+    # Find the month with maximum content
+    best_month_idx = monthly_recent.values.argmax()
+    best_month = best_month_idx + 1  # Add 1 because months are 1-indexed
+    
+    # Highlight the best month
+    bars[best_month_idx].set_color('gold')
+    
+    plt.title('Optimal Release Month Based on Recent Netflix Additions (2015 onwards)', fontsize=16)
+    plt.xlabel('Month', fontsize=14)
+    plt.ylabel('Number of Titles Added', fontsize=14)
+    plt.xticks(rotation=45)
+    
+    plt.annotate(f'Optimal Release Month: {calendar.month_name[best_month]}',
+                xy=(best_month_idx, monthly_recent.values[best_month_idx]),
+                xytext=(best_month_idx - 2, monthly_recent.values[best_month_idx] + 50),
+                arrowprops=dict(facecolor='black', shrink=0.05, width=1.5),
+                fontsize=12)
+    
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    _mfajlsdf98q21_image_title_list.append('Optimal Release Month Based on Recent Netflix Additions')
+    plt.tight_layout()
+    plt.show()
+
+# 10. Content duration analysis
+def plot_duration_analysis():
+    plt.figure(figsize=(14, 8))
+    
+    # Analyze movie durations
+    movie_df = df[df['type'] == 'Movie']
+    movie_df = movie_df[movie_df['duration_numeric'].notna()]
+    
+    # Create histogram for movie durations
+    plt.hist(movie_df['duration_numeric'], bins=15, alpha=0.7, color='coral')
+    
+    # Find the most common duration range
+    movie_duration_counts = pd.cut(movie_df['duration_numeric'], bins=15).value_counts().sort_index()
+    most_common_range = movie_duration_counts.idxmax()
+    
+    plt.title('Distribution of Movie Durations on Netflix', fontsize=16)
+    plt.xlabel('Duration (minutes)', fontsize=14)
+    plt.ylabel('Number of Movies', fontsize=14)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Add annotation for most common duration range
+    plt.annotate(f'Most Common Duration Range: {most_common_range}',
+                xy=(most_common_range.mid, movie_duration_counts.max()),
+                xytext=(most_common_range.mid, movie_duration_counts.max() + 20),
+                arrowprops=dict(facecolor='black', shrink=0.05),
+                fontsize=12)
+    
+    _mfajlsdf98q21_image_title_list.append('Distribution of Movie Durations on Netflix')
+    plt.tight_layout()
+    plt.show()
+
+# Execute all analysis functions
+print("Starting visualization of Netflix content analysis...")
+
+# Core analyses for producer decisions
+plot_content_distribution()
+plot_monthly_release_pattern()
+plot_monthly_content_by_type()
+plot_optimal_release_month()
+plot_ratings_distribution()
+plot_genre_distribution()
+plot_top_countries()
+plot_release_trends()
+plot_duration_analysis()
+
+print("Analysis complete! The following visualizations were created:")
+for i, title in enumerate(_mfajlsdf98q21_image_title_list, 1):
+    print(f"{i}. {title}")
+
+print("\nConclusions for producers:")
+print("1. Optimal Release Month: The analysis shows when content is most frequently added to Netflix, suggesting potentially strategic timing for releases.")
+print("2. Content Type Distribution: Understanding the balance between Movies and TV Shows can help producers decide which format may have less competition.")
+print("3. Rating Categories: The distribution of rating categories shows which audience segments have more or less content available.")
+print("4. Genre Analysis: The most popular genres on Netflix can inform content creation decisions.")
+print("5. Duration Analysis: Understanding the most common movie lengths can help producers optimize their content duration.")
