@@ -48,17 +48,17 @@ netflix-data-analysis/ │ ├── netflix_data.csv # (Expected) Dataset sourc
 1. Make sure you have Python 3.x installed.
 2. Install required libraries:
 
-##📄 Report
+## 📄 Report
 The executive summary and insights are available in:
 report/netflix_data_analysis.pdf
 
-##📷 Sample Outputs
+## 📷 Sample Outputs
 You may store your output visualizations in a folder named /visuals for reference or presentation.
 
-##🧩 Contribution
+## 🧩 Contribution
 This is a solo data exploration project, but feedback and suggestions are welcome!
 
-##📝 License
+## 📝 License
 MIT License
 
 vbnet
