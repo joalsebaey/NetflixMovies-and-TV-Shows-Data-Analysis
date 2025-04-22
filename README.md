@@ -60,5 +60,3 @@ This is a solo data exploration project, but feedback and suggestions are welcom
 
 ## 📝 License
 MIT License
-
-Let me know if you'd like me to create a downloadable version of this file or include additional sections like acknowledgments or demo screenshots.
